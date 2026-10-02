@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>曲面 S と接平面 π の関係</title>
+  
+  <!-- MathJax for rendering LaTeX labels -->
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [['$', '$'], ['\\(', '\\)']]
+      },
+      svg: {
+        fontCache: 'global'
+      }
+    };
+  </script>
+  <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+
+  <!-- Three.js & OrbitControls -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background-color: #0b0f19;
+      color: #e2e8f0;
+      overflow: hidden;
+      height: 100vh;
+      width: 100vw;
+    }
+    #canvas-container {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 1;
+    }
+    #ui-panel {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      z-index: 10;
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      padding: 20px;
+      width: 380px;
+      max-height: calc(100vh - 40px);
+      overflow-y: auto;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+    }
+    h1 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-bottom: 12px;
+      color: #f8fafc;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      padding-bottom: 8px;
+    }
+    .math-desc {
+      font-size: 0.85rem;
+      line-height: 1.5;
+      color: #94a3b8;
+      margin-bottom: 16px;
+      background: rgba(0, 0, 0, 0.2);
+      padding: 10px;
+      border-radius: 8px;
+    }
+    .control-group {
+      margin-bottom: 14px;
+    }
+    label {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.85rem;
+      margin-bottom: 6px;
+      color: #cbd5e1;
+    }
+    select {
+      width: 100%;
+      background: rgba(30, 41, 59, 0.9);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: #f8fafc;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      outline: none;
+      cursor: pointer;
+    }
+    select:focus {
+      border-color: #6366f1;
+    }
+    input[type=range] {
+      width: 100%;
+      height: 5px;
+      border-radius: 5px;
+      background: #334155;
+      outline: none;
+      -webkit-appearance: none;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #818cf8;
+      cursor: pointer;
+      transition: background .15s ease-in-out;
+    }
+    input[type=range]::-webkit-slider-thumb:hover {
+      background: #a5b4fc;
+    }
+    .btn-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .toggle-btn {
+      background: rgba(30, 41, 59, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: #94a3b8;
+      padding: 8px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-align: center;
+    }
+    .toggle-btn.active {
+      background: #4f46e5;
+      color: #ffffff;
+      border-color: #6366f1;
+      box-shadow: 0 0 10px rgba(99, 102, 241, 0.3);
+    }
+    .legend {
+      margin-top: 16px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      font-size: 0.75rem;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+    .legend-color {
+      width: 10px;
+      height: 10px;
+      border-radius: 2px;
+      margin-right: 8px;
+    }
+
+    /* LaTeX 2D Label Overlay Styles */
+    .latex-label {
+      position: absolute;
+      z-index: 5;
+      color: #ffffff;
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.8rem;
+      pointer-events: none;
+      transform: translate(-50%, -50%);
+      transition: opacity 0.15s ease;
+      white-space: nowrap;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+    }
+  </style>
+</head>
+<body>
+
+  <div id="canvas-container"></div>
+
+  <div id="ui-panel">
+    <h1>曲面 $S$ と接平面 $\pi$ の関係</h1>
+    
+    <div class="math-desc">
+      曲面 $S : z = f(x,y)$ 上の点 $(a, b)$ において：<br>
+      ・平面 $A : x = a$ 上の接線 $l_b$<br>
+      ・平面 $B : y = b$ 上の接線 $l_a$<br>
+      接平面 $\pi$ は $l_a, l_b$ の両方を含みます。
+    </div>
+
+    <div class="control-group">
+      <label for="surface-select">曲面 $S : z = f(x,y)$ の種類</label>
+      <select id="surface-select">
+        <option value="dome">上に凸な曲面: z = 4 - (x² + y²)/2</option>
+        <option value="paraboloid">下に凸な曲面: z = (x² + y²)/2</option>
+        <option value="saddle">鞍状面: z = (x² - y²)/2</option>
+        <option value="wave">波動面: z = sin(x)cos(y)</option>
+        <option value="custom">複合曲面: z = (x²+y²)/4 - cos(x)sin(y)/2</option>
+      </select>
+    </div>
+
+    <div class="control-group">
+      <label>点 $a$ ($x$ 座標): <span id="val-a">0.50</span></label>
+      <input type="range" id="slider-a" min="-2.0" max="2.0" step="0.05" value="0.5">
+    </div>
+
+    <div class="control-group">
+      <label>点 $b$ ($y$ 座標): <span id="val-b">0.50</span></label>
+      <input type="range" id="slider-b" min="-2.0" max="2.0" step="0.05" value="0.5">
+    </div>
+
+    <div class="btn-grid">
+      <button id="btn-planeA" class="toggle-btn active">平面 $A\,(x=a)$</button>
+      <button id="btn-planeB" class="toggle-btn active">平面 $B\,(y=b)$</button>
+      <button id="btn-lineA" class="toggle-btn active">接線 $l_a$</button>
+      <button id="btn-lineB" class="toggle-btn active">接線 $l_b$</button>
+      <button id="btn-tangent" class="toggle-btn active" style="grid-column: span 2;">接平面 $\pi$</button>
+    </div>
+
+    <div class="legend">
+      <div class="legend-item"><div class="legend-color" style="background: #3b82f6;"></div>曲面 $S: z = f(x,y)$</div>
+      <div class="legend-item"><div class="legend-color" style="background: #ef4444;"></div>平面 $A: x=a$ / 接線 $l_b$（平面A上）</div>
+      <div class="legend-item"><div class="legend-color" style="background: #10b981;"></div>平面 $B: y=b$ / 接線 $l_a$（平面B上）</div>
+      <div class="legend-item"><div class="legend-color" style="background: #f59e0b;"></div>接平面 $\pi$</div>
+    </div>
+  </div>
+
+  <!-- HTML Labels for MathJax Overlay -->
+  <div id="labels-container">
+    <div id="label-P" class="latex-label">$P(a,b)$</div>
+    <div id="label-planeA" class="latex-label">平面 $A: x=a$</div>
+    <div id="label-planeB" class="latex-label">平面 $B: y=b$</div>
+    <div id="label-lineA" class="latex-label">接線 $l_a$</div>
+    <div id="label-lineB" class="latex-label">接線 $l_b$</div>
+    <div id="label-tangent" class="latex-label">接平面 $\pi$</div>
+    <div id="label-surface" class="latex-label">曲面 $S$</div>
+  </div>
+
+  <script>
+    // --- State & Parameters ---
+    let surfaceType = 'dome';
+    let a = 0.5, b = 0.5;
+    let showPlaneA = true, showPlaneB = true;
+    let showLineA = true, showLineB = true;
+    let showTangent = true;
+
+    // --- Function Definitions & Derivatives ---
+    function f(x, y) {
+      switch (surfaceType) {
+        case 'dome': return 4.0 - (x * x + y * y) * 0.5;
+        case 'paraboloid': return (x * x + y * y) * 0.5;
+        case 'saddle': return (x * x - y * y) * 0.5;
+        case 'wave': return Math.sin(x) * Math.cos(y);
+        case 'custom': return (x * x + y * y) * 0.25 - (Math.cos(x) * Math.sin(y)) * 0.5;
+        default: return 0;
+      }
+    }
+
+    function df_dx(x, y) {
+      switch (surfaceType) {
+        case 'dome': return -x;
+        case 'paraboloid': return x;
+        case 'saddle': return x;
+        case 'wave': return Math.cos(x) * Math.cos(y);
+        case 'custom': return 0.5 * x + 0.5 * Math.sin(x) * Math.sin(y);
+        default: return 0;
+      }
+    }
+
+    function df_dy(x, y) {
+      switch (surfaceType) {
+        case 'dome': return -y;
+        case 'paraboloid': return y;
+        case 'saddle': return -y;
+        case 'wave': return -Math.sin(x) * Math.sin(y);
+        case 'custom': return 0.5 * y - 0.5 * Math.cos(x) * Math.cos(y);
+        default: return 0;
+      }
+    }
+
+    // --- Three.js Setup ---
+    const container = document.getElementById('canvas-container');
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0b0f19);
+
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+    // 初期カメラ位置（全体の幾何関係が見やすいアングル）
+    camera.position.set(4.5, -6.5, 5.5);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    container.appendChild(renderer.domElement);
+
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+    controls.target.set(0, 0, 1.8);
+
+    // --- Lighting ---
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    scene.add(ambientLight);
+
+    const dirLight1 = new THREE.DirectionalLight(0xffffff, 0.8);
+    dirLight1.position.set(5, -5, 10);
+    scene.add(dirLight1);
+
+    const dirLight2 = new THREE.DirectionalLight(0x818cf8, 0.4);
+    dirLight2.position.set(-5, 5, -2);
+    scene.add(dirLight2);
+
+    // Grid Helper
+    const gridHelper = new THREE.GridHelper(8, 20, 0x334155, 0x1e293b);
+    gridHelper.rotation.x = Math.PI / 2;
+    scene.add(gridHelper);
+
+    // --- Object Holders ---
+    let surfaceMesh, planeAMesh, planeBMesh, tangentMesh;
+    let lineAMesh, lineBMesh, curveAMesh, curveBMesh;
+    let pointP;
+
+    // メモリリークおよびポリゴン崩れを防ぐ破棄関数
+    function safeDispose(mesh) {
+      if (!mesh) return;
+      scene.remove(mesh);
+      if (mesh.geometry) mesh.geometry.dispose();
+      if (mesh.material) {
+        if (Array.isArray(mesh.material)) {
+          mesh.material.forEach(m => m.dispose());
+        } else {
+          mesh.material.dispose();
+        }
+      }
+    }
+
+    // --- Build / Update Scene Objects ---
+    function updateGraphics() {
+      const z0 = f(a, b);
+      const fx = df_dx(a, b);
+      const fy = df_dy(a, b);
+
+      // 1. 曲面 S
+      safeDispose(surfaceMesh);
+      const surfGeo = new THREE.PlaneGeometry(5, 5, 60, 60);
+      const posAttr = surfGeo.attributes.position;
+      for (let i = 0; i < posAttr.count; i++) {
+        const x = posAttr.getX(i);
+        const y = posAttr.getY(i);
+        posAttr.setZ(i, f(x, y));
+      }
+      surfGeo.computeVertexNormals();
+
+      const surfMat = new THREE.MeshPhongMaterial({
+        color: 0x2563eb,
+        transparent: true,
+        opacity: 0.75,
+        side: THREE.DoubleSide,
+        shininess: 80,
+        wireframe: false
+      });
+      surfaceMesh = new THREE.Mesh(surfGeo, surfMat);
+      scene.add(surfaceMesh);
+
+      // 2. 点 P(a,b,f(a,b))
+      if (!pointP) {
+        const pGeo = new THREE.SphereGeometry(0.08, 32, 32);
+        const pMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+        pointP = new THREE.Mesh(pGeo, pMat);
+        scene.add(pointP);
+      }
+      pointP.position.set(a, b, z0);
+
+      // 3. 平面 A (x = a)
+      safeDispose(planeAMesh);
+      if (showPlaneA) {
+        const planeAGeo = new THREE.PlaneGeometry(5, 6);
+        const planeAMat = new THREE.MeshPhongMaterial({
+          color: 0xef4444,
+          transparent: true,
+          opacity: 0.35,
+          side: THREE.DoubleSide
+        });
+        planeAMesh = new THREE.Mesh(planeAGeo, planeAMat);
+        planeAMesh.position.set(a, 0, 1.5);
+        planeAMesh.rotation.y = Math.PI / 2;
+        scene.add(planeAMesh);
+      }
+
+      // 4. 平面 B (y = b)
+      safeDispose(planeBMesh);
+      if (showPlaneB) {
+        const planeBGeo = new THREE.PlaneGeometry(5, 6);
+        const planeBMat = new THREE.MeshPhongMaterial({
+          color: 0x10b981,
+          transparent: true,
+          opacity: 0.35,
+          side: THREE.DoubleSide
+        });
+        planeBMesh = new THREE.Mesh(planeBGeo, planeBMat);
+        planeBMesh.position.set(0, b, 1.5);
+        planeBMesh.rotation.x = Math.PI / 2;
+        scene.add(planeBMesh);
+      }
+
+      // 5. 切断面 A (x = a) の曲線と接線 l_b
+      safeDispose(curveAMesh);
+      safeDispose(lineBMesh);
+      if (showPlaneA) {
+        const ptsA = [];
+        for (let yVal = -2.5; yVal <= 2.5; yVal += 0.1) {
+          ptsA.push(new THREE.Vector3(a, yVal, f(a, yVal)));
+        }
+        const curveAGeo = new THREE.BufferGeometry().setFromPoints(ptsA);
+        const curveAMat = new THREE.LineBasicMaterial({ color: 0xfca5a5, linewidth: 2 });
+        curveAMesh = new THREE.Line(curveAGeo, curveAMat);
+        scene.add(curveAMesh);
+      }
+
+      if (showLineB) {
+        const lineBPts = [
+          new THREE.Vector3(a, b - 1.5, z0 - 1.5 * fy),
+          new THREE.Vector3(a, b + 1.5, z0 + 1.5 * fy)
+        ];
+        const lineBGeo = new THREE.BufferGeometry().setFromPoints(lineBPts);
+        const lineBMat = new THREE.LineBasicMaterial({ color: 0xef4444, linewidth: 5 });
+        lineBMesh = new THREE.Line(lineBGeo, lineBMat);
+        scene.add(lineBMesh);
+      }
+
+      // 6. 切断面 B (y = b) の曲線と接線 l_a
+      safeDispose(curveBMesh);
+      safeDispose(lineAMesh);
+      if (showPlaneB) {
+        const ptsB = [];
+        for (let xVal = -2.5; xVal <= 2.5; xVal += 0.1) {
+          ptsB.push(new THREE.Vector3(xVal, b, f(xVal, b)));
+        }
+        const curveBGeo = new THREE.BufferGeometry().setFromPoints(ptsB);
+        const curveBMat = new THREE.LineBasicMaterial({ color: 0x6ee7b7, linewidth: 2 });
+        curveBMesh = new THREE.Line(curveBGeo, curveBMat);
+        scene.add(curveBMesh);
+      }
+
+      if (showLineA) {
+        const lineAPts = [
+          new THREE.Vector3(a - 1.5, b, z0 - 1.5 * fx),
+          new THREE.Vector3(a + 1.5, b, z0 + 1.5 * fx)
+        ];
+        const lineAGeo = new THREE.BufferGeometry().setFromPoints(lineAPts);
+        const lineAMat = new THREE.LineBasicMaterial({ color: 0x10b981, linewidth: 5 });
+        lineAMesh = new THREE.Line(lineAGeo, lineAMat);
+        scene.add(lineAMesh);
+      }
+
+      // 7. 接平面 π
+      safeDispose(tangentMesh);
+      if (showTangent) {
+        const tanGeo = new THREE.PlaneGeometry(2.5, 2.5);
+        const tanMat = new THREE.MeshPhongMaterial({
+          color: 0xf59e0b,
+          transparent: true,
+          opacity: 0.65,
+          side: THREE.DoubleSide,
+          shininess: 100
+        });
+        tangentMesh = new THREE.Mesh(tanGeo, tanMat);
+        tangentMesh.position.set(a, b, z0);
+
+        // 法線ベクトル: N = (-fx, -fy, 1)
+        const normal = new THREE.Vector3(-fx, -fy, 1).normalize();
+        const defaultNormal = new THREE.Vector3(0, 0, 1);
+        const quaternion = new THREE.Quaternion().setFromUnitVectors(defaultNormal, normal);
+        tangentMesh.quaternion.copy(quaternion);
+
+        scene.add(tangentMesh);
+      }
+
+      // ラベル位置の更新
+      updateLabelPositions();
+    }
+
+    // --- 3D座標から2D画面要素への投影処理 ---
+    const labels = {
+      P: { element: document.getElementById('label-P'), getPos: () => new THREE.Vector3(a, b, f(a, b) + 0.15) },
+      planeA: { element: document.getElementById('label-planeA'), getPos: () => new THREE.Vector3(a, 1.8, 1.8), visible: () => showPlaneA },
+      planeB: { element: document.getElementById('label-planeB'), getPos: () => new THREE.Vector3(-1.8, b, 1.8), visible: () => showPlaneB },
+      lineA: { element: document.getElementById('label-lineA'), getPos: () => new THREE.Vector3(a - 1.0, b, f(a, b) - 1.0 * df_dx(a, b)), visible: () => showLineA },
+      lineB: { element: document.getElementById('label-lineB'), getPos: () => new THREE.Vector3(a, b + 1.0, f(a, b) + 1.0 * df_dy(a, b)), visible: () => showLineB },
+      tangent: { element: document.getElementById('label-tangent'), getPos: () => new THREE.Vector3(a + 0.6, b + 0.6, f(a, b) + 0.6 * df_dx(a, b) + 0.6 * df_dy(a, b)), visible: () => showTangent },
+      surface: { element: document.getElementById('label-surface'), getPos: () => new THREE.Vector3(-1.8, -1.8, f(-1.8, -1.8)) }
+    };
+
+    function updateLabelPositions() {
+      const tempV = new THREE.Vector3();
+      for (const key in labels) {
+        const item = labels[key];
+        if (item.visible && !item.visible()) {
+          item.element.style.opacity = '0';
+          continue;
+        }
+        
+        tempV.copy(item.getPos());
+        tempV.project(camera);
+
+        if (tempV.z > 1) {
+          item.element.style.opacity = '0';
+          continue;
+        }
+
+        const x = (tempV.x *  .5 + .5) * window.innerWidth;
+        const y = (tempV.y * -.5 + .5) * window.innerHeight;
+
+        item.element.style.transform = `translate(-50%, -50%) translate(${x}px,${y}px)`;
+        item.element.style.opacity = '1';
+      }
+    }
+
+    // --- UI イベントリスナー ---
+    document.getElementById('surface-select').addEventListener('change', (e) => {
+      surfaceType = e.target.value;
+      updateGraphics();
+    });
+
+    document.getElementById('slider-a').addEventListener('input', (e) => {
+      a = parseFloat(e.target.value);
+      document.getElementById('val-a').textContent = a.toFixed(2);
+      updateGraphics();
+    });
+
+    document.getElementById('slider-b').addEventListener('input', (e) => {
+      b = parseFloat(e.target.value);
+      document.getElementById('val-b').textContent = b.toFixed(2);
+      updateGraphics();
+    });
+
+    const setupToggleBtn = (id, getter, setter) => {
+      const btn = document.getElementById(id);
+      btn.addEventListener('click', () => {
+        const newVal = !getter();
+        setter(newVal);
+        btn.classList.toggle('active', newVal);
+        updateGraphics();
+      });
+    };
+
+    setupToggleBtn('btn-planeA', () => showPlaneA, v => showPlaneA = v);
+    setupToggleBtn('btn-planeB', () => showPlaneB, v => showPlaneB = v);
+    setupToggleBtn('btn-lineA', () => showLineA, v => showLineA = v);
+    setupToggleBtn('btn-lineB', () => showLineB, v => showLineB = v);
+    setupToggleBtn('btn-tangent', () => showTangent, v => showTangent = v);
+
+    // リサイズ処理
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      updateLabelPositions();
+    });
+
+    // アニメーションループ
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      updateLabelPositions();
+      renderer.render(scene, camera);
+    }
+
+    // 初期化実行
+    updateGraphics();
+    animate();
+  </script>
+</body>
+</html>
